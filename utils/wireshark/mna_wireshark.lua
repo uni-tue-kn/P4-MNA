@@ -10,6 +10,7 @@
 # ------------------------------------------------------------- #
 # Changelog:                                                    #
 # 25.04.2024 - Initial version                                  #
+# 05.07.2024 - Update encoding to mpls-mna-hdr-07               #
 #################################################################
 --]] 
 
@@ -23,20 +24,19 @@ init_reserved = ProtoField.uint32("MNA.reserved", "Reserved", base.DEC, NULL,
                                   2048)
 init_scope = ProtoField.uint32("MNA.scope", "Scope", base.DEC, NULL, 1536)
 bos = ProtoField.uint32("MNA.bos", "Bottom of Stack", base.DEC, NULL, 256)
-init_reserved2 = ProtoField.uint32("MNA.reserved2", "Reserved", base.DEC, NULL,
-                                   224)
 init_unknown_action = ProtoField.uint32("MNA.unknown_action",
                                         "Unknown Action Handling", base.DEC,
-                                        NULL, 16)
-init_nasl = ProtoField.uint32("MNA.nasl", "NASL", base.DEC, NULL, 15)
+                                        NULL, 128)
+init_nasl = ProtoField.uint32("MNA.nasl", "NASL", base.DEC, NULL, 120)
+init_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
 
 -- Sub opcode (Format C)
 sub_opcode = ProtoField.uint32("MNA.sub_opcode", "Opcode", base.DEC, NULL,
                                4261412864)
-sub_data1 =
-    ProtoField.uint32("MNA.sub_data1", "Data1", base.DEC, NULL, 16776960)
-sub_data2 = ProtoField.uint32("MNA.sub_data2", "Data2", base.DEC, NULL, 240)
-sub_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 15)
+sub_data1 = ProtoField.uint32("MNA.sub_data1", "Data1", base.DEC, NULL, 16776960)
+sub_unknown_action = ProtoField.uint32("MNA.sub_unknown_action", "Unknown Action Handling", base.DEC, NULL, 128)
+sub_data2 = ProtoField.uint32("MNA.sub_data2", "Data2", base.DEC, NULL, 120)
+sub_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
 
 -- AD LSE (Format D)
 ad_one = ProtoField.uint32("MNA.ad_one", "Constant", base.DEC, NULL, 2147483648)
@@ -52,9 +52,9 @@ ttl = ProtoField.uint32("MNA.ttl", "TTL", base.DEC, NULL, 255)
 -- TODO fix the uint32 types
 
 mna_protocol.fields = {
-    label, tc, ttl, ad_one, init_opcode, sub_opcode, init_data1, ad_data1,
+    label, tc, ttl, ad_one, init_opcode, sub_opcode, init_data1, sub_unknown_action, ad_data1,
     sub_data1, init_reserved, init_scope, bos, sub_data2, init_reserved2,
-    init_unknown_action, ad_data2, init_nasl, sub_nal
+    init_unknown_action, ad_data2, init_nasl, init_nal, sub_nal
 }
 
 psd_protocol = Proto("PSD", "MNA Post-Stack Data")
@@ -137,7 +137,9 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                 scope_str = "Undefined"
             end
 
-            nasl = bit.band(initial_opcode_lse:uint(), 15)
+            nasl = bit.rshift(bit.band(initial_opcode_lse:uint(), 120), 3)
+
+            init_nal_lookahead = bit.band(initial_opcode_lse:uint(), 7)
 
             nas_subtree = subtree:add(mna_protocol, buffer(), "NAS " ..
                                           scope_str .. ", Length: " .. nasl)
@@ -167,14 +169,32 @@ function mna_protocol.dissector(buffer, pinfo, tree)
             init_opcode_subtree:add(init_reserved, initial_opcode_lse)
             init_opcode_subtree:add(init_scope, initial_opcode_lse)
             init_opcode_subtree:add(bos, initial_opcode_lse)
-            init_opcode_subtree:add(init_reserved2, initial_opcode_lse)
             init_opcode_subtree:add(init_unknown_action, initial_opcode_lse)
             init_opcode_subtree:add(init_nasl, initial_opcode_lse)
+            init_opcode_subtree:add(init_nal, initial_opcode_lse)
             lse_number = lse_number + 1
 
-            if nasl > 0 then
+            -- TODO NAL for init opcode here
+            if init_nal_lookahead > 0 then
+                for a = 1, init_nal_lookahead do
+                    -- Get Ancillary Data for initial opcode LSE
+                    ad_lse = buffer(lse_number * 4, 4)
+                    ad_subtree =
+                        nas_subtree:add(mna_protocol, buffer(),
+                                        "MNA NAS Ancillary data LSE")
+                    lookahead_bos = bit.band(ad_lse:int(), 256);
+
+                    ad_subtree:add(ad_one, ad_lse)
+                    ad_subtree:add(ad_data1, ad_lse)
+                    ad_subtree:add(ad_data2, ad_lse)
+
+                    lse_number = lse_number + 1
+                end
+            end
+
+            if nasl - init_nal_lookahead > 0 then
                 local s = 0
-                while s < nasl do
+                while s < nasl - init_nal_lookahead do
                     -- Get subsequent opcode
                     sub_opcode_lse = buffer(lse_number * 4, 4)
 
@@ -184,7 +204,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                     local lookahead_data1 =
                         bit.rshift(bit.band(sub_opcode_lse:uint(), 16776960), 9)
                     local lookahead_data2 =
-                        bit.rshift(bit.band(sub_opcode_lse:uint(), 240), 4)
+                        bit.rshift(bit.band(sub_opcode_lse:uint(), 240), 4) -- TODO
                     lookahead_bos = bit.band(sub_opcode_lse:int(), 256);
 
                     sub_opcode_subtree =
@@ -194,10 +214,11 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                                             lookahead_data1,
                                         " Data2: " .. lookahead_data2)
 
-                    nal = bit.band(sub_opcode_lse:uint(), 15)
+                    nal = bit.band(sub_opcode_lse:uint(), 7)
                     sub_opcode_subtree:add(sub_opcode, sub_opcode_lse)
                     sub_opcode_subtree:add(sub_data1, sub_opcode_lse)
                     sub_opcode_subtree:add(bos, sub_opcode_lse)
+                    sub_opcode_subtree:add(sub_unknown_action, sub_opcode_lse)
                     sub_opcode_subtree:add(sub_data2, sub_opcode_lse)
                     sub_opcode_subtree:add(sub_nal, sub_opcode_lse)
                     lse_number = lse_number + 1
