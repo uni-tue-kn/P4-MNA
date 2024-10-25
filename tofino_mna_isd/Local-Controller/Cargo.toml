@@ -1,0 +1,13 @@
+[package]
+name = "mna"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rbfrt = { git = "https://github.com/uni-tue-kn/rbfrt" }
+tokio = { version = "1.20.1", features = ["rt-multi-thread"]}
+log = "0.4"
+env_logger = "0.10.0"
+macaddr = "1.0.1"
