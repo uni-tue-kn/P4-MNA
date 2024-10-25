@@ -8,6 +8,7 @@
 # ------------------------------------------------------------- #
 # Changelog:                                                    #
 # 25.04.2024 - Initial version                                  #
+# 25.10.2024 - Bug fixes introduced with latest encoding        #
 #################################################################
 
 from scapy.all import Ether, IP, get_if_hwaddr, sendp, Raw, UDP
@@ -25,10 +26,10 @@ def label_stack_hbh_select(hbh_count=2, select_count=2):
     hbh_nas = NAS(initial_opcode=64, initial_data=0, scope=Scope.HBH,unknown_action_handling=UnkownActionHandling.IGNORE)
     for _ in range(hbh_count):
         # Add subsequent opcodes
-        hbh_nas.add_subsequent_opcode(opcode=64, data=2, mutable_data=0)
+        hbh_nas.add_subsequent_opcode(opcode=64, data=2, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
     select_nas = NAS(initial_opcode=64, initial_data=0, scope=Scope.SELECT, unknown_action_handling=UnkownActionHandling.IGNORE)
     for _ in range(select_count):
-        select_nas.add_subsequent_opcode(opcode=64, data=2, mutable_data=0)
+        select_nas.add_subsequent_opcode(opcode=64, data=2, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
 
     # Add ancillary data to first subsequent opcode
     hbh_nas.subsequent_opcodes[0].add_ancillary_data(0, 0)
@@ -58,7 +59,7 @@ def label_stack_hbh_only(number_of_actions=2):
     l2 = MPLS_LSE(label=60, tc=7, bos=0, ttl=63)
 
     for _ in range(number_of_actions - 1):
-        hbh_nas.add_subsequent_opcode(opcode=64, data=0, mutable_data=0)
+        hbh_nas.add_subsequent_opcode(opcode=64, data=0, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
 
     # Ancillary Data can be added like this
     #hbh_nas.subsequent_opcodes[0].add_ancillary_data(0, 0)
@@ -82,7 +83,7 @@ def label_stack_ioam_path_tracing():
     l6 = MPLS_LSE(label=1000, tc=7, bos=0, ttl=63)
     hbh_nas = NAS(initial_opcode=64, initial_data=0, scope=Scope.HBH, unknown_action_handling=UnkownActionHandling.IGNORE)
 
-    hbh_nas.add_subsequent_opcode(opcode=42, data=16, mutable_data=0)
+    hbh_nas.add_subsequent_opcode(opcode=42, data=16, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
     for i in range(5):
         hbh_nas.subsequent_opcodes[0].add_ancillary_data(0, 0)
 
@@ -106,7 +107,7 @@ def label_stack_select_only(number_of_actions=2):
     l2 = MPLS_LSE(label=60, tc=7, bos=0, ttl=63)
 
     for _ in range(number_of_actions - 1):
-        hbh_nas.add_subsequent_opcode(opcode=64, data=0, mutable_data=0)
+        hbh_nas.add_subsequent_opcode(opcode=64, data=0, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
 
     label_stack = [l1, hbh_nas, l2]
     return label_stack
@@ -138,12 +139,12 @@ def label_stack_hbh_select_psd(hbh_count, select_count, psd_count):
     hbh_nas.initial_lse.reserved = 1
 
     for _ in range(hbh_count):
-        hbh_nas.add_subsequent_opcode(opcode=64, data=2, mutable_data=0)
+        hbh_nas.add_subsequent_opcode(opcode=64, data=2, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
         
     hbh_nas.subsequent_opcodes[0].add_ancillary_data(0, 0)
     select_nas = NAS(initial_opcode=64, initial_data=0, scope=Scope.SELECT, unknown_action_handling=UnkownActionHandling.IGNORE)
     for _ in range(select_count):
-        select_nas.add_subsequent_opcode(opcode=64, data=2, mutable_data=0)
+        select_nas.add_subsequent_opcode(opcode=64, data=2, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0)
 
     psd_top = PSDTopHeader()
     for _ in range(psd_count):
@@ -157,6 +158,26 @@ def label_stack_hbh_select_psd(hbh_count, select_count, psd_count):
 
 
     label_stack = [l1, select_nas, l2, l3, hbh_nas, l4, l5], [psd_top]
+    return label_stack
+
+def label_stack_pmamm_isd(color):
+    """
+    :param color: 0 for color A, 2 for color B
+    """
+    # Forwarding Label 1
+    l1 = MPLS_LSE(label=500, tc=7, bos=0, ttl=63)
+    # Forwarding Label 2
+    l2 = MPLS_LSE(label=600, tc=7, bos=0, ttl=63)
+    # Forwarding Label 3
+    l3 = MPLS_LSE(label=700, tc=7, bos=0, ttl=63)
+    l4 = MPLS_LSE(label=800, tc=7, bos=0, ttl=63)
+    l5 = MPLS_LSE(label=900, tc=7, bos=0, ttl=63)
+    
+    hbh_nas = NAS(initial_opcode=1, initial_data=0, scope=Scope.HBH,unknown_action_handling=UnkownActionHandling.IGNORE)
+    hbh_nas.add_subsequent_opcode(opcode=43, data=2, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=color) # Two bits for flow id, last bit for packet loss measurement  
+
+    label_stack = [l1,  l2, l3, l4, hbh_nas, l5]
+
     return label_stack
 
 
@@ -232,7 +253,8 @@ interface = "ens18"
 #label_stack = label_stack_hbh_only(7)
 #label_stack = label_stack_select_only(2)
 #label_stack = label_stack_no_mna(4)
-label_stack, psd = label_stack_hbh_select_psd(3,4,1)
+label_stack = label_stack_pmamm_isd(4)
+#label_stack, psd = label_stack_hbh_select_psd(3,4,1)
 
 print_label_stack(label_stack)
 

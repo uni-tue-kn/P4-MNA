@@ -11,6 +11,7 @@
 # Changelog:                                                    #
 # 25.04.2024 - Initial version                                  #
 # 05.07.2024 - Update encoding to mpls-mna-hdr-07               #
+# 25.10.2024 - Bug fixes introduced with latest encoding        #
 #################################################################
 --]] 
 
@@ -33,7 +34,7 @@ init_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
 -- Sub opcode (Format C)
 sub_opcode = ProtoField.uint32("MNA.sub_opcode", "Opcode", base.DEC, NULL,
                                4261412864)
-sub_data1 = ProtoField.uint32("MNA.sub_data1", "Data1", base.DEC, NULL, 16776960)
+sub_data1 = ProtoField.uint32("MNA.sub_data1", "Data1", base.DEC, NULL, 33553920)
 sub_unknown_action = ProtoField.uint32("MNA.sub_unknown_action", "Unknown Action Handling", base.DEC, NULL, 128)
 sub_data2 = ProtoField.uint32("MNA.sub_data2", "Data2", base.DEC, NULL, 120)
 sub_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
@@ -186,6 +187,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
 
                     ad_subtree:add(ad_one, ad_lse)
                     ad_subtree:add(ad_data1, ad_lse)
+                    ad_subtree:add(bos, ad_lse)
                     ad_subtree:add(ad_data2, ad_lse)
 
                     lse_number = lse_number + 1
@@ -202,9 +204,9 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                         bit.rshift(bit.band(sub_opcode_lse:uint(), 4261412864),
                                    25)
                     local lookahead_data1 =
-                        bit.rshift(bit.band(sub_opcode_lse:uint(), 16776960), 9)
+                        bit.rshift(bit.band(sub_opcode_lse:uint(), 33553920), 9)
                     local lookahead_data2 =
-                        bit.rshift(bit.band(sub_opcode_lse:uint(), 240), 4) -- TODO
+                        bit.rshift(bit.band(sub_opcode_lse:uint(), 120), 3)
                     lookahead_bos = bit.band(sub_opcode_lse:int(), 256);
 
                     sub_opcode_subtree =
@@ -235,6 +237,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
 
                             ad_subtree:add(ad_one, ad_lse)
                             ad_subtree:add(ad_data1, ad_lse)
+                            ad_subtree:add(bos, ad_lse)
                             ad_subtree:add(ad_data2, ad_lse)
 
                             lse_number = lse_number + 1
@@ -329,10 +332,10 @@ function psd_protocol.dissector(buffer, pinfo, tree)
                 for a = 1, lookahead_nal do
 
                     ad_lse = buffer(lse_number * 4, 4)
-                    local lookahed_data = ad_lse:uint()
+                    local lookahed_data_psd = ad_lse:uint()
 
                     ad_subtree = subtree:add(psd_protocol, buffer(),
-                                             "MNA PSD, Data: " .. lookahead_data)
+                                             "MNA PSD, Data: " .. lookahed_data_psd)
 
                     ad_subtree:add(psd_full_data, ad_lse)
 

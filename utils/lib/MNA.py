@@ -9,6 +9,7 @@
 # Changelog:                                                    #
 # 25.04.2024 - Initial version                                  #
 # 05.07.2024 - Update encoding to mpls-mna-hdr-07               #
+# 25.10.2024 - Bug fixes introduced with latest encoding        #
 #################################################################
 
 from enum import Enum
@@ -55,10 +56,10 @@ class MPLS_LSE():
 
 class InitialLSE():
 
-    def __init__(self, opcode, data, scope: Scope, bos, unknown_action_handling: UnkownActionHandling) -> None:
+    def __init__(self, opcode, data, p_bit, scope: Scope, bos, unknown_action_handling: UnkownActionHandling) -> None:
         self.opcode = opcode
         self.data = data
-        self.reserved = 0
+        self.p_bit = p_bit # PSD present
         self.ihs = scope
         self.bos = bos if bos else 0 # will be computed later 
         self.unknown_action_handling = unknown_action_handling
@@ -79,21 +80,21 @@ class InitialLSE():
         self.NASL += 1
 
     def __str__(self) -> str:
-        s = [f"|  Initial opcode: {self.opcode}, Scope: {self.ihs.name}, NASL: {self.NASL}, NAL: {self.NAL}, BoS: {self.bos} |, {hex(self.get_payload())}"]
+        s = [f"|  Initial opcode: {self.opcode}, Scope: {self.ihs.name}, NASL: {self.NASL}, NAL: {self.NAL}, BoS: {self.bos}, P: {self.p_bit} |, {hex(self.get_payload())}"]
         [s.append(str(ad)) for ad in self.ancillary_data]
         return "\n".join(s)
     
     def get_payload(self):
         opcode_bits = str(bin(self.opcode)[2:]).zfill(7)
         data_bits = str(bin(self.data)[2:]).zfill(13)
-        reserved_bits = str(bin(self.reserved)[2:]).zfill(1)
+        p_bits = str(bin(self.p_bit)[2:]).zfill(1)
         ihs_bits = str(bin(self.ihs.value)[2:]).zfill(2)
         bos_bits = str(bin(self.bos)[2:]).zfill(1)
         unknown_action_bits = str(bin(self.unknown_action_handling.value)[2:]).zfill(1)
         NASL_bits = str(bin(self.NASL)[2:]).zfill(4)
         NAL_bits = str(bin(self.NAL)[2:]).zfill(3)
 
-        s = opcode_bits + data_bits + reserved_bits + ihs_bits + bos_bits + unknown_action_bits + NASL_bits + NAL_bits
+        s = opcode_bits + data_bits + p_bits + ihs_bits + bos_bits + unknown_action_bits + NASL_bits + NAL_bits
         s_h = ""
         assert len(s) == 32
 
@@ -107,7 +108,7 @@ class InitialLSE():
         return self.get_payload()
 
 class SubsequentOpcodeLSE():
-    def __init__(self, nas, opcode, data=0, bos=0, unknown_action_handling=0, mutable_data=0) -> None:
+    def __init__(self, nas, opcode, data=0, bos=0, unknown_action_handling=UnkownActionHandling.IGNORE, mutable_data=0) -> None:
         self.nas = nas
         self.opcode = opcode
         self.data = data 
@@ -135,7 +136,7 @@ class SubsequentOpcodeLSE():
         opcode_bits = str(bin(self.opcode)[2:]).zfill(7)
         data_bits = str(bin(self.data)[2:]).zfill(16)
         bos_bits = str(bin(self.bos)[2:]).zfill(1)
-        unknown_action_bits = str(bin(self.unknown_action_handling)[2:]).zfill(1)
+        unknown_action_bits = str(bin(self.unknown_action_handling.value)[2:]).zfill(1)
         data2_bits = str(bin(self.mutable_data)[2:]).zfill(4)
         NAL_bits = str(bin(self.NAL)[2:]).zfill(3)
 
@@ -184,13 +185,13 @@ class AncillaryDataLSE():
         return self.get_payload()
 
 class NAS():
-    def __init__(self, initial_opcode, initial_data, scope: Scope, unknown_action_handling: UnkownActionHandling) -> None:
+    def __init__(self, initial_opcode, initial_data, scope: Scope, unknown_action_handling: UnkownActionHandling, p_bit=0) -> None:
         self.NSI = MPLS_LSE(label=4, tc=7, bos=0, ttl=64)
-        self.initial_lse = InitialLSE(initial_opcode, initial_data, scope, 0, unknown_action_handling)
+        self.initial_lse = InitialLSE(initial_opcode, initial_data, p_bit, scope, 0, unknown_action_handling)
         self.subsequent_opcodes = []
 
-    def add_subsequent_opcode(self, opcode, data, mutable_data, bos=0):
-        sub_op = SubsequentOpcodeLSE(self, opcode, data, bos, mutable_data)
+    def add_subsequent_opcode(self, opcode, data, unknown_action_handling, mutable_data, bos=0):
+        sub_op = SubsequentOpcodeLSE(self, opcode, data, bos, unknown_action_handling, mutable_data)
         self.subsequent_opcodes.append(sub_op)
 
         # Recalculate NASL
