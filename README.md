@@ -5,6 +5,15 @@
 
 </div>
 
+- [Overview](#overview)
+- [Installation & Start Instructions](#installation--start-instructions)
+  - [Data plane](#data-plane)
+  - [Control plane](#control-plane)
+- [Utils](#utils)
+  - [Wireshark Dissector](#wireshark-dissector)
+  - [MNA Framework Python Libary](#mna-framework-python-library)
+- [Cite](#citing-p4-mna)
+
 ## Overview
 This repository contains the source code of MPLS Network Action (MNA) implementations in P4 for the Intel Tofino 2 switching ASIC as introduced by the [MPLS Working Group](https://datatracker.ietf.org/wg/mpls/about/).
 The MNA in-stack data (ISD) implementation features
