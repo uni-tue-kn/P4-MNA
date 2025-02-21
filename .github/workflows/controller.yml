@@ -17,4 +17,4 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
 
     - name: Controller Build
-      run: cd P4-MNA/tofino_mna_isd/Local-Controller && cargo build
+      run: cd tofino_mna_isd/Local-Controller && cargo build

@@ -18,4 +18,4 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Tofino2 CI
-        run: cd P4-MNA/tofino_mna_isd/P4-Implementation && sudo -E /open-p4studio/install/bin/bf-p4c -D__TARGET_TOFINO__=2 --target tofino2 -g --arch t2na -o /opt/mna_isd mna_isd.p4
+        run: cd tofino_mna_isd/P4-Implementation && sudo -E /open-p4studio/install/bin/bf-p4c -D__TARGET_TOFINO__=2 --target tofino2 -g --arch t2na -o /opt/mna_isd mna_isd.p4
