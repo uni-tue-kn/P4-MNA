@@ -26,20 +26,6 @@ control MNA_SECOND_NAS(inout header_t hdr,
         ig_dprsr_md.drop_ctl = 0x1;
    }
 
-   action send_digest(){
-        ig_dprsr_md.digest_type = 1;
-   }
-
-   action send_digest_initial(){
-        ig_dprsr_md.digest_type = 1;
-        debug_mna_initial_counter.count();
-   }
-
-   action set_executed_1(){
-        hdr.mna_initial_opcode_second_nas.data = 1;
-        debug_mna_initial_counter.count();
-   }
-
    action action_initial_with_0_ad(){
       debug_mna_initial_counter.count();
       hdr.mna_initial_opcode_second_nas.data = 1;
@@ -1165,6 +1151,36 @@ control MNA_SECOND_NAS(inout header_t hdr,
        ig_md.processed_subopcodes.index14 = 1;
    }
 
+
+   /* 
+   Actions for network slicing
+   */
+   action action_initial_nrp_with_0_ad(){
+      debug_mna_initial_counter.count();
+      ig_md.nrp.active = true;
+      ig_md.nrp.identifier = (bit<16>)hdr.mna_initial_opcode.data;
+   }
+
+   action action_0_nrp_with_0_ad(){
+      debug_mna_action_index_0_counter.count();
+      ig_md.nrp.active = true;
+      ig_md.nrp.identifier = hdr.mna_subsequent_opcodes_second_nas[0].data;
+   }
+   action action_1_nrp_with_0_ad(){
+      debug_mna_action_index_1_counter.count();
+      ig_md.nrp.active = true;
+      ig_md.nrp.identifier = hdr.mna_subsequent_opcodes_second_nas[1].data;
+   }
+   action action_2_nrp_with_0_ad(){
+      debug_mna_action_index_2_counter.count();
+      ig_md.nrp.active = true;
+      ig_md.nrp.identifier = hdr.mna_subsequent_opcodes_second_nas[2].data;
+   }
+
+
+   /*
+   Actions for AMM
+   */
     action action_0_AMM_color_a_with_0_ad(){
       debug_mna_action_index_0_counter.count();
       ig_md.amm.color = 0;
@@ -1191,188 +1207,6 @@ control MNA_SECOND_NAS(inout header_t hdr,
       ig_md.amm.active = true;
       ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[1].data ++ hdr.mna_subsequent_opcodes_second_nas[1].data2[3:2];      
    }
-   
-    
-    action action_2_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_2_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[2].data ++ hdr.mna_subsequent_opcodes_second_nas[2].data2[3:2];
-   }
-   action action_2_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_2_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[2].data ++ hdr.mna_subsequent_opcodes_second_nas[2].data2[3:2];      
-   }
-   
-    
-    action action_3_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_3_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[3].data ++ hdr.mna_subsequent_opcodes_second_nas[3].data2[3:2];
-   }
-   action action_3_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_3_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[3].data ++ hdr.mna_subsequent_opcodes_second_nas[3].data2[3:2];      
-   }
-   
-    
-    action action_4_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_4_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[4].data ++ hdr.mna_subsequent_opcodes_second_nas[4].data2[3:2];
-   }
-   action action_4_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_4_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[4].data ++ hdr.mna_subsequent_opcodes_second_nas[4].data2[3:2];      
-   }
-   
-    
-    action action_5_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_5_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[5].data ++ hdr.mna_subsequent_opcodes_second_nas[5].data2[3:2];
-   }
-   action action_5_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_5_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[5].data ++ hdr.mna_subsequent_opcodes_second_nas[5].data2[3:2];      
-   }
-   
-    
-    action action_6_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_6_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[6].data ++ hdr.mna_subsequent_opcodes_second_nas[6].data2[3:2];
-   }
-   action action_6_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_6_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[6].data ++ hdr.mna_subsequent_opcodes_second_nas[6].data2[3:2];      
-   }
-   
-    
-    action action_7_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_7_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[7].data ++ hdr.mna_subsequent_opcodes_second_nas[7].data2[3:2];
-   }
-   action action_7_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_7_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[7].data ++ hdr.mna_subsequent_opcodes_second_nas[7].data2[3:2];      
-   }
-   
-    
-    action action_8_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_8_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[8].data ++ hdr.mna_subsequent_opcodes_second_nas[8].data2[3:2];
-   }
-   action action_8_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_8_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[8].data ++ hdr.mna_subsequent_opcodes_second_nas[8].data2[3:2];      
-   }
-   
-    
-    action action_9_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_9_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[9].data ++ hdr.mna_subsequent_opcodes_second_nas[9].data2[3:2];
-   }
-   action action_9_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_9_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[9].data ++ hdr.mna_subsequent_opcodes_second_nas[9].data2[3:2];      
-   }
-   
-    
-    action action_10_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_10_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[10].data ++ hdr.mna_subsequent_opcodes_second_nas[10].data2[3:2];
-   }
-   action action_10_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_10_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[10].data ++ hdr.mna_subsequent_opcodes_second_nas[10].data2[3:2];      
-   }
-   
-    
-    action action_11_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_11_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[11].data ++ hdr.mna_subsequent_opcodes_second_nas[11].data2[3:2];
-   }
-   action action_11_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_11_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[11].data ++ hdr.mna_subsequent_opcodes_second_nas[11].data2[3:2];      
-   }
-   
-    
-    action action_12_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_12_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[12].data ++ hdr.mna_subsequent_opcodes_second_nas[12].data2[3:2];
-   }
-   action action_12_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_12_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[12].data ++ hdr.mna_subsequent_opcodes_second_nas[12].data2[3:2];      
-   }
-   
-    
-    action action_13_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_13_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[13].data ++ hdr.mna_subsequent_opcodes_second_nas[13].data2[3:2];
-   }
-   action action_13_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_13_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[13].data ++ hdr.mna_subsequent_opcodes_second_nas[13].data2[3:2];      
-   }
-   
-    
-    action action_14_AMM_color_a_with_0_ad(){
-      debug_mna_action_index_14_counter.count();
-      ig_md.amm.color = 0;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[14].data ++ hdr.mna_subsequent_opcodes_second_nas[14].data2[3:2];
-   }
-   action action_14_AMM_color_b_with_0_ad(){
-      debug_mna_action_index_14_counter.count();
-      ig_md.amm.color = 1;
-      ig_md.amm.active = true;
-      ig_md.amm.flow_identifier = hdr.mna_subsequent_opcodes_second_nas[14].data ++ hdr.mna_subsequent_opcodes_second_nas[14].data2[3:2];      
-   }
 
    table mna_initial_opcode {
       key = {
@@ -1381,7 +1215,6 @@ control MNA_SECOND_NAS(inout header_t hdr,
             hdr.mna_initial_opcode_second_nas.data: ternary;
       }
       actions = {
-            send_digest_initial;
             action_initial_with_0_ad;
             action_initial_with_1_ad;
             action_initial_with_2_ad;
@@ -1390,10 +1223,9 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_initial_with_5_ad;
             action_initial_with_6_ad;
             action_initial_with_7_ad;                    
-            set_executed_1;
+            action_initial_nrp_with_0_ad;
       }
       size = 128;
-      default_action = send_digest_initial();
       counters = debug_mna_initial_counter;
    }
 
@@ -1578,9 +1410,7 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_5_with_4_ad;
             action_5_with_5_ad;
             action_5_with_6_ad;
-            action_5_with_7_ad;   
-            action_5_AMM_color_a_with_0_ad;
-            action_5_AMM_color_b_with_0_ad;                     
+            action_5_with_7_ad;                     
       }
       size = 128;
       counters = debug_mna_action_index_5_counter;
@@ -1601,9 +1431,7 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_4_with_4_ad;
             action_4_with_5_ad;
             action_4_with_6_ad;
-            action_4_with_7_ad;   
-            action_4_AMM_color_a_with_0_ad;
-            action_4_AMM_color_b_with_0_ad;                     
+            action_4_with_7_ad;                      
       }
       size = 128;
       counters = debug_mna_action_index_4_counter;
@@ -1626,8 +1454,6 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_3_with_5_ad;
             action_3_with_6_ad;
             action_3_with_7_ad;    
-            action_3_AMM_color_a_with_0_ad;
-            action_3_AMM_color_b_with_0_ad;                   
       }
       size = 128;
       counters = debug_mna_action_index_3_counter;
@@ -1650,8 +1476,7 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_2_with_5_ad;
             action_2_with_6_ad;
             action_2_with_7_ad;
-            action_2_AMM_color_a_with_0_ad;
-            action_2_AMM_color_b_with_0_ad;            
+            action_2_nrp_with_0_ad;          
       }
       size = 128;
       counters = debug_mna_action_index_2_counter;
@@ -1675,7 +1500,8 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_1_with_6_ad;
             action_1_with_7_ad;
             action_1_AMM_color_a_with_0_ad;
-            action_1_AMM_color_b_with_0_ad;            
+            action_1_AMM_color_b_with_0_ad;
+            action_1_nrp_with_0_ad;         
       }
       size = 128;
       counters = debug_mna_action_index_1_counter;
@@ -1700,6 +1526,7 @@ control MNA_SECOND_NAS(inout header_t hdr,
             action_0_with_7_ad;
             action_0_AMM_color_a_with_0_ad;
             action_0_AMM_color_b_with_0_ad;
+            action_0_nrp_with_0_ad;
       }
       size = 128;
       counters = debug_mna_action_index_0_counter;
@@ -1878,6 +1705,7 @@ control MNA_SECOND_NAS(inout header_t hdr,
          }
       }
 
+      /*
       if (hdr.mna_subsequent_opcodes_second_nas[14].isValid()) {
          if (ig_md.processed_subopcodes.index14 == 0) {
             if (mna_subsequent_opcode_14.apply().miss){
@@ -1888,5 +1716,6 @@ control MNA_SECOND_NAS(inout header_t hdr,
             }
          }
       }
+      */
    }
 }

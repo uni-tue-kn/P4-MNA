@@ -997,32 +997,13 @@ control SwitchIngressDeparser(
         in ingress_intrinsic_metadata_t ig_intr_md) {
 
 
-    Digest<digest_valid_headers_t>() digest_valid_headers;
     Digest<digest_pmamm_t>() digest_pmamm;
 
     Resubmit() resubmit;
 
     apply {
 
-        /*
-        if (ig_dprsr_md.digest_type == 2){
-            digest_valid_headers.pack({
-                                        hdr.mpls.label, 
-                                        hdr.ethernet.ether_type, 
-                                        hdr.mna_nasi.label, 
-                                        hdr.mna_initial_opcode.opcode,
-                                        hdr.nasi_second_nas.label,
-                                        hdr.mna_initial_opcode_second_nas.opcode,
-                                        ig_dprsr_md.drop_ctl,
-                                        ig_md.recirculation_needed,
-                                        hdr.mna_subsequent_opcodes[0].opcode,
-                                        hdr.mna_subsequent_opcodes[7].opcode,
-                                        hdr.mna_subsequent_opcodes_second_nas[0].opcode,
-                                        hdr.mna_subsequent_opcodes_second_nas[7].opcode,
-                                        hdr.recirculation_data.processing_stage,
-                                        ig_md.parser_error,
-                                        ig_md.hbh_processing_done});
-        } else*/ if (ig_dprsr_md.digest_type == 3){
+        if (ig_dprsr_md.digest_type == 3){
             digest_pmamm.pack({
                 ig_md.amm.packets_color_a,
                 ig_md.amm.packets_color_b,

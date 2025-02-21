@@ -10,6 +10,9 @@ control MNA(inout header_t hdr,
     MNA_FIRST_NAS() mna_first_nas_c;
     MNA_SECOND_NAS() mna_second_nas_c;
 
+    DirectCounter<bit<32>>(CounterType_t.PACKETS) network_slice_counter;
+    DirectMeter(MeterType_t.BYTES) flow_meter;
+
     action drop(){
         ig_dprsr_md.drop_ctl = 0x1;
     }
@@ -107,6 +110,32 @@ control MNA(inout header_t hdr,
         }
     };    
 
+    action set_color_direct() {
+        // Execute the Direct meter and write the color into metadata
+        /*
+        0: GREEN
+        1: YELLOW
+        2: YELLOW
+        3: RED
+        */
+        // Color-Aware labeling: Pre-color is set accordingly (pre-color always green for color-blind mode)
+        ig_tm_md.packet_color = (bit<2>)flow_meter.execute();
+        network_slice_counter.count();
+    }
+
+   table network_slicing {
+      key = {
+        ig_md.nrp.identifier: exact;
+      }
+     actions = {
+        set_color_direct;
+      }
+      size = 16;
+      meters = flow_meter;
+      
+      counters = network_slice_counter;
+   }
+
 
     apply {
 
@@ -129,6 +158,13 @@ control MNA(inout header_t hdr,
                     ig_md.amm.packets_color_a = read_color_a.execute(ig_md.amm.flow_identifier);
                     ig_md.amm.packets_color_b = increment_color_b.execute(ig_md.amm.flow_identifier);
                 }
+            }
+        }
+
+        if (ig_md.nrp.active){
+            network_slicing.apply();
+            if (ig_tm_md.packet_color == 3) {
+                ig_dprsr_md.drop_ctl = 0x3;
             }
         }
 

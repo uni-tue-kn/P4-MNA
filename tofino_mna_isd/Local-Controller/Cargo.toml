@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rbfrt = { git = "https://github.com/uni-tue-kn/rbfrt" }
+rbfrt = { git = "https://github.com/uni-tue-kn/rbfrt", branch = "dev"}
 tokio = { version = "1.20.1", features = ["rt-multi-thread"]}
 log = "0.4"
 env_logger = "0.10.0"

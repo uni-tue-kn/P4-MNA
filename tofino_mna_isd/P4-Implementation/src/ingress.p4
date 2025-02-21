@@ -13,12 +13,8 @@ control ingress(
     apply {
         mpls_c.apply(hdr, ig_md, ig_tm_md, ig_intr_md, ig_dprsr_md);
 
-        ig_md.parser_error = ig_prsr_md.parser_err;
-
         if (ig_md.amm.generate_amm_digest == 1){
             ig_dprsr_md.digest_type = 3;
-        } else {
-            ig_dprsr_md.digest_type = 2;
         }
         
     }

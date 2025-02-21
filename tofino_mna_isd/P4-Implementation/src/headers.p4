@@ -194,6 +194,11 @@ struct amm_t {
     bit<8> generate_amm_digest;
 }
 
+struct nrp_t {
+    bit<16> identifier;
+    bool active;
+}
+
 struct ingress_metadata_t {
     processed_subopcodes_t processed_subopcodes;
     bit<1> resubmit_needed;
@@ -203,6 +208,7 @@ struct ingress_metadata_t {
     bit<8> reg_recirc_port_index;
     nasi_with_initial_opcode_h nasi_with_initial_opcode;
     amm_t amm;
+    nrp_t nrp;
     resubmit_header_h resubmit;
 }
 
