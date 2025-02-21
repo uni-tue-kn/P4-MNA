@@ -6,7 +6,7 @@ In the future, our P4 implementation of the MNA framework will be added to this 
 
 ## Disclaimer
 
-The provided libraries follow the current state of the [MNA encoding draft](https://www.ietf.org/archive/id/draft-ietf-mpls-mna-hdr-04.html) for ISD, and the [PSD encoding draft](https://datatracker.ietf.org/doc/html/draft-jags-mpls-ps-mna-hdr-01) for PSD. 
+The provided libraries follow the current state of the [MNA encoding draft](https://www.ietf.org/archive/id/draft-ietf-mpls-mna-hdr-08.html) for ISD, and the [PSD encoding draft](https://datatracker.ietf.org/doc/html/draft-jags-mpls-ps-mna-hdr-03) for PSD. 
 
 They do not represent a final implementation or solution, and may not be free of bugs.
 
