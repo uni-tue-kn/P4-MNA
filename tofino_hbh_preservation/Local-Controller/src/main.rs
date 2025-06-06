@@ -18,9 +18,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use log::{info, warn};
-use rbfrt::util::port_manager::{AutoNegotiation, Loopback, Port, Speed, FEC};
+use rbfrt::util::{AutoNegotiation, Port, Speed};
 use rbfrt::util::{PortManager, PrettyPrinter};
-use rbfrt::{ table, SwitchConnection};
+use rbfrt::{table, SwitchConnection};
 
 mod mna;
 use mna::MNAController;
@@ -28,7 +28,7 @@ use mna::MNAController;
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     info!("Start controller...");
 
-    let switch = SwitchConnection::new("localhost", 50052)
+    let switch = SwitchConnection::builder("localhost", 50052)
         .device_id(0)
         .client_id(1)
         .p4_name("mna_hbh_preservation")
@@ -143,7 +143,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         let req: table::Request = table::Request::new(table_to_check);
 
-        let res = switch.get_table_entry(req).await?;
+        let res = switch.get_table_entries(req).await?;
 
         pp.print_table(res)?;
 

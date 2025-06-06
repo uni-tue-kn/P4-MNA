@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use log::{info, warn};
 use rbfrt::register::Register;
-use rbfrt::util::port_manager::{AutoNegotiation, Loopback, Port, Speed, FEC};
+use rbfrt::util::{AutoNegotiation, Loopback, Port, Speed, FEC};
 use rbfrt::util::{PortManager, PrettyPrinter};
 use rbfrt::{register, table, SwitchConnection};
 
@@ -29,7 +29,7 @@ use mna::MNAController;
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     info!("Start controller...");
 
-    let mut switch = SwitchConnection::new("localhost", 50052)
+    let mut switch = SwitchConnection::builder("localhost", 50052)
         .device_id(0)
         .client_id(1)
         .p4_name("mna_isd")
@@ -42,13 +42,30 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut port_requests: Vec<Port> = vec![];
 
-    // Configure ports here as needed
+    // Frank 5 <-> Pennywise 17:00.0, enp23s0f0np0
+    //let pm_req = Port::new(5, 0)
+    //    .speed(Speed::BF_SPEED_100G)
+    //    .auto_negotiation(AutoNegotiation::PM_AN_FORCE_DISABLE);
+    //port_requests.push(pm_req);
+    // Frank 3 <-> P4TG donnie 4
+    let pm_req = Port::new(3, 0).speed(Speed::BF_SPEED_100G);
+    port_requests.push(pm_req);
+    let pm_req = Port::new(10, 0).speed(Speed::BF_SPEED_100G).auto_negotiation(AutoNegotiation::PM_AN_FORCE_DISABLE);
+    port_requests.push(pm_req);    
+    // Frank 5 <-> P4TG donnie 6
     let pm_req = Port::new(5, 0).speed(Speed::BF_SPEED_400G).fec(FEC::BF_FEC_TYP_REED_SOLOMON);
     port_requests.push(pm_req);    
+
+    let carrie_ports = vec![1, 11, 12, 17];
+    for p in carrie_ports {
+        let pm_req = Port::new(p, 0).speed(Speed::BF_SPEED_100G);
+        port_requests.push(pm_req);
+    }
 
     pm.add_ports(&mut switch, &port_requests).await?;
 
     info!("Ports of device configured.");
+
 
     // Mapping of (mpls_label, egress_dev_port)
     let mpls_label_to_egress_port_mapping = HashMap::from([
@@ -133,7 +150,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         let req: table::Request = table::Request::new(table_to_check);
 
-        let res = switch.get_table_entry(req).await?;
+        let res = switch.get_table_entries(req).await?;
 
         pp.print_table(res)?;
 
