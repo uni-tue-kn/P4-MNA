@@ -6,13 +6,16 @@
 </div>
 
 - [Overview](#overview)
-- [Installation & Start Instructions](#installation--start-instructions)
-  - [Data plane](#data-plane)
-  - [Control plane](#control-plane)
+- [Installation \& Start Instructions](#installation--start-instructions)
+  - [Data Plane](#data-plane)
+  - [Control Plane](#control-plane)
 - [Utils](#utils)
   - [Wireshark Dissector](#wireshark-dissector)
-  - [MNA Framework Python Libary](#mna-framework-python-library)
-- [Cite](#citing-p4-mna)
+    - [Example](#example)
+  - [MNA Framework Python Library](#mna-framework-python-library)
+    - [Example Output of an MNA frame](#example-output-of-an-mna-frame)
+  - [MNA Evaluation](#mna-evaluation)
+- [Citing P4-MNA](#citing-p4-mna)
 
 ## Overview
 This repository contains the source code of MPLS Network Action (MNA) implementations in P4 for the Intel Tofino 2 switching ASIC as introduced by the [MPLS Working Group](https://datatracker.ietf.org/wg/mpls/about/).
@@ -88,4 +91,4 @@ The directory `evaluation` contains files that script traffic generation using t
 ## Citing P4-MNA
 
 If you use P4-MNA in any of your publications, please cite the following paper:
-- [F. Ihle and M.Menth, MPLS Network Actions: Technological Overview and P4-Based Implementation on a High-Speed Switching ASIC](https://arxiv.org/abs/2410.20400), preprint, Feb. 2025, (under submission)
+- [F. Ihle and M.Menth: MPLS Network Actions: Technological Overview and P4-Based Implementation on a High-Speed Switching ASIC](https://ieeexplore.ieee.org/document/10947349), [erratum](https://ieeexplore.ieee.org/document/11010923), [preprint](https://atlas.cs.uni-tuebingen.de/~ihle/IhMe24.pdf), in IEEE Open Journal of the Communications Society, vol. 6, pp. 3480 - 3501, Apr. 2025, IEEE
