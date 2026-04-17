@@ -12,7 +12,7 @@
 # 25.04.2024 - Initial version                                  #
 # 05.07.2024 - Update encoding to mpls-mna-hdr-07               #
 # 25.10.2024 - Bug fixes introduced with latest encoding        #
-# 17.04.2026 - Added DetNet control word                        #
+# 17.04.2026 - Adapted new PSD encoding, Added DetNet CW        #
 #################################################################
 --]]  
 
@@ -22,8 +22,7 @@ mna_protocol = Proto("MNA", "MPLS Network Actions")
 init_opcode = ProtoField.uint32("MNA.initial_opcode", "Opcode", base.DEC, NULL,
                                 4261412864)
 init_data1 = ProtoField.uint32("MNA.data1", "Data1", base.DEC, NULL, 33550336)
-init_reserved = ProtoField.uint32("MNA.reserved", "Reserved", base.DEC, NULL,
-                                  2048)
+init_p = ProtoField.uint32("MNA.p_bit", "P Bit", base.DEC, NULL, 2048)
 init_scope = ProtoField.uint32("MNA.scope", "Scope", base.DEC, NULL, 1536)
 bos = ProtoField.uint32("MNA.bos", "Bottom of Stack", base.DEC, NULL, 256)
 init_unknown_action = ProtoField.uint32("MNA.unknown_action",
@@ -55,34 +54,35 @@ ttl = ProtoField.uint32("MNA.ttl", "TTL", base.DEC, NULL, 255)
 
 mna_protocol.fields = {
     label, tc, ttl, ad_one, init_opcode, sub_opcode, init_data1, sub_unknown_action, ad_data1,
-    sub_data1, init_reserved, init_scope, bos, sub_data2, init_reserved2,
+    sub_data1, init_p, init_scope, bos, sub_data2,
     init_unknown_action, ad_data2, init_nasl, init_nal, sub_nal
 }
 
-psd_protocol = Proto("PSD", "MNA Post-Stack Data")
+psd_protocol = Proto("PSM", "MNA Post-Stack Data")
 
--- Network Action Top Header
-psd_first_nibble = ProtoField.uint32("PSD.first_nibble", "First Nibble",
-                                     base.DEC, NULL, 4026531840)
-psd_version = ProtoField.uint32("PSD.version", "Version", base.DEC, NULL,
-                                251658240)
-psd_ps_len = ProtoField.uint32("PSD.length", "Length", base.DEC, NULL, 16711680)
-psd_type = ProtoField.uint32("PSD.type", "Type", base.DEC, NULL, 65535)
+-- Post-Stack MNA Header (PSMHT)
+psmh_pfn = ProtoField.uint32("PSM.pfn", "PFN", base.DEC, NULL, 0xF0000000)
+psmh_reserved = ProtoField.uint32("PSM.psmh_reserved", "Reserved", base.DEC,
+                                  NULL, 0x0F000000)
+psmh_len = ProtoField.uint32("PSM.psmh_len", "PSMH-Len", base.DEC, NULL,
+                             0x00FF0000)
+psmh_type = ProtoField.uint32("PSM.type", "Type", base.DEC, NULL, 0x0000FFFF)
 
--- Network Action Header
-psd_opcode = ProtoField.uint32("PSD.opcode", "Opcode", base.DEC, NULL,
-                               4261412864)
-psd_rr = ProtoField.uint32("PSD.reserved", "Reserved", base.DEC, NULL, 25165824)
-psd_ps_nal = ProtoField.uint32("PSD.ps_nal", "Network Action Length", base.DEC,
-                               NULL, 8323072)
-psd_data = ProtoField.uint32("PSD.na_data", "Data", base.DEC, NULL, 65535)
+-- Post-Stack Network Action (PSNA)
+psna_opcode = ProtoField.uint32("PSM.opcode", "Opcode", base.DEC, NULL,
+                                0xFE000000)
+psna_reserved = ProtoField.uint32("PSM.psna_reserved", "Reserved", base.DEC,
+                                  NULL, 0x01800000)
+psna_ps_nal = ProtoField.uint32("PSM.ps_nal", "PS-NAL", base.DEC, NULL,
+                                0x007F0000)
+psna_data = ProtoField.uint32("PSM.data16", "Data", base.DEC, NULL, 0x0000FFFF)
 
--- 32 bits treated as data. Fill this later with PSD encoding
-psd_full_data = ProtoField.uint32("PSD.data", "Data", base.DEC)
+-- 32 bits treated as continuation data
+psd_full_data = ProtoField.uint32("PSM.data", "Data", base.DEC)
 
 psd_protocol.fields = {
-    psd_first_nibble, psd_version, psd_ps_len, psd_type, psd_opcode, psd_rr,
-    psd_ps_nal, psd_data, psd_full_data
+    psmh_pfn, psmh_reserved, psmh_len, psmh_type, psna_opcode,
+    psna_reserved, psna_ps_nal, psna_data, psd_full_data
 }
 
 detnet_cw_protocol = Proto("DetNetCW", "DetNet Control Word")
@@ -95,23 +95,53 @@ detnet_cw_sequence_number = ProtoField.uint32("DetNetCW.sequence_number",
 
 detnet_cw_protocol.fields = {detnet_cw_version, detnet_cw_sequence_number}
 
--- TO BE CHANGED ON IANA SPECIFICATION
 local MNA_BSPL = 4;
-local FIRST_NIBBLE_PSD = 10
+local MPLS_MNA_PSMHT_TYPE = 1
 
 local MPLS_ETHER_TYPE = 0x8847;
 local DETNET_CONTROL_WORD_FIRST_NIBBLE = 0
 local IPV4_VERSION = 4
 local IPV6_VERSION = 6
 
+local function has_bytes(buffer, byte_offset, byte_length)
+    return byte_offset + byte_length <= buffer:len()
+end
+
+local function get_first_nibble(buffer, byte_offset)
+    if not has_bytes(buffer, byte_offset, 1) then
+        return nil
+    end
+
+    local first_byte = buffer(byte_offset, 1)
+    return bit.rshift(bit.band(first_byte:uint(), 0xF0), 4)
+end
+
+local function is_psmht(buffer, byte_offset)
+    if not has_bytes(buffer, byte_offset, 4) then
+        return false
+    end
+
+    local word = buffer(byte_offset, 4):uint()
+    local pfn = bit.rshift(bit.band(word, 0xF0000000), 28)
+    local reserved = bit.rshift(bit.band(word, 0x0F000000), 24)
+    local psmht_type = bit.band(word, 0x0000FFFF)
+
+    return pfn == 0 and reserved == 0 and psmht_type == MPLS_MNA_PSMHT_TYPE
+end
+
 local function dissect_post_stack_payload(buffer, byte_offset, pinfo, tree)
     if byte_offset >= buffer:len() then return end
 
-    local first_byte = buffer(byte_offset, 1)
-    local first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
+    if is_psmht(buffer, byte_offset) then
+        psd_protocol.dissector(buffer:range(byte_offset):tvb(), pinfo, tree)
+        return
+    end
+
+    local first_nibble = get_first_nibble(buffer, byte_offset)
+    if first_nibble == nil then return end
 
     if first_nibble == DETNET_CONTROL_WORD_FIRST_NIBBLE then
-        if byte_offset + 4 > buffer:len() then return end
+        if not has_bytes(buffer, byte_offset, 4) then return end
 
         local detnet_cw = buffer(byte_offset, 4)
         local detnet_cw_subtree = tree:add(detnet_cw_protocol, detnet_cw,
@@ -123,8 +153,8 @@ local function dissect_post_stack_payload(buffer, byte_offset, pinfo, tree)
         byte_offset = byte_offset + 4
         if byte_offset >= buffer:len() then return end
 
-        first_byte = buffer(byte_offset, 1)
-        first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
+        first_nibble = get_first_nibble(buffer, byte_offset)
+        if first_nibble == nil then return end
     end
 
     if first_nibble == IPV4_VERSION then
@@ -133,8 +163,6 @@ local function dissect_post_stack_payload(buffer, byte_offset, pinfo, tree)
     elseif first_nibble == IPV6_VERSION then
         ipv6_dissector = Dissector.get("ipv6")
         ipv6_dissector:call(buffer:range(byte_offset):tvb(), pinfo, tree)
-    elseif first_nibble == FIRST_NIBBLE_PSD then
-        psd_protocol.dissector(buffer:range(byte_offset):tvb(), pinfo, tree)
     end
 end
 
@@ -213,7 +241,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                                                   " Data: " .. lookahead_data)
             init_opcode_subtree:add(init_opcode, initial_opcode_lse)
             init_opcode_subtree:add(init_data1, initial_opcode_lse)
-            init_opcode_subtree:add(init_reserved, initial_opcode_lse)
+            init_opcode_subtree:add(init_p, initial_opcode_lse)
             init_opcode_subtree:add(init_scope, initial_opcode_lse)
             init_opcode_subtree:add(bos, initial_opcode_lse)
             init_opcode_subtree:add(init_unknown_action, initial_opcode_lse)
@@ -322,59 +350,63 @@ function psd_protocol.dissector(buffer, pinfo, tree)
 
     local lse_number = 0
 
+    if not has_bytes(buffer, lse_number * 4, 4) then return end
     local lse = buffer(lse_number * 4, 4)
 
-    lookahead_psd_length = bit.rshift(bit.band(lse:uint(), 16711680), 16)
+    lookahead_psd_length = bit.rshift(bit.band(lse:uint(), 0x00FF0000), 16)
 
     top_header_subtree = subtree:add(psd_protocol, buffer(),
-                                     "PSD Network Action Top Header, Length: " ..
+                                     "Post-Stack MNA Header, Length: " ..
                                          lookahead_psd_length)
-    top_header_subtree:add(psd_first_nibble, lse)
-    top_header_subtree:add(psd_version, lse)
-    top_header_subtree:add(psd_ps_len, lse)
-    top_header_subtree:add(psd_type, lse)
+    top_header_subtree:add(psmh_pfn, lse)
+    top_header_subtree:add(psmh_reserved, lse)
+    top_header_subtree:add(psmh_len, lse)
+    top_header_subtree:add(psmh_type, lse)
 
     lse_number = lse_number + 1
 
     if lookahead_psd_length > 0 then
-        local s = 0
-        while s < lookahead_psd_length do
+        local words_consumed = 0
+        while words_consumed < lookahead_psd_length do
+            if not has_bytes(buffer, lse_number * 4, 4) then return end
 
-            -- Get subsequent opcode
             psd_na = buffer(lse_number * 4, 4)
 
             local lookahead_opcode = bit.rshift(
-                                         bit.band(psd_na:uint(), 4261412864), 25)
-            local lookahead_nal = bit.rshift(bit.band(psd_na:uint(), 8323072),
+                                         bit.band(psd_na:uint(), 0xFE000000), 25)
+            local lookahead_nal = bit.rshift(bit.band(psd_na:uint(), 0x007F0000),
                                              16)
-            local lookahead_data = bit.band(psd_na:uint(), 65535)
+            local lookahead_data = bit.band(psd_na:uint(), 0x0000FFFF)
             psd_na_subtree = subtree:add(psd_protocol, buffer(),
-                                         "MNA PSD Opcode LSE, Opcode: " ..
+                                         "Post-Stack Network Action, Opcode: " ..
                                              lookahead_opcode .. " Length: " ..
                                              lookahead_nal,
                                          " Data: " .. lookahead_data)
 
-            psd_na_subtree:add(psd_opcode, psd_na)
-            psd_na_subtree:add(psd_rr, psd_na)
-            psd_na_subtree:add(psd_ps_nal, psd_na)
-            psd_na_subtree:add(psd_data, psd_na)
+            psd_na_subtree:add(psna_opcode, psd_na)
+            psd_na_subtree:add(psna_reserved, psd_na)
+            psd_na_subtree:add(psna_ps_nal, psd_na)
+            psd_na_subtree:add(psna_data, psd_na)
 
             lse_number = lse_number + 1
-            s = s + 1
+            words_consumed = words_consumed + 1
 
             if lookahead_nal > 0 then
                 for a = 1, lookahead_nal do
+                    if words_consumed >= lookahead_psd_length then return end
+                    if not has_bytes(buffer, lse_number * 4, 4) then return end
 
                     ad_lse = buffer(lse_number * 4, 4)
                     local lookahed_data_psd = ad_lse:uint()
 
                     ad_subtree = subtree:add(psd_protocol, buffer(),
-                                             "MNA PSD, Data: " .. lookahed_data_psd)
+                                             "Post-Stack Data, Data: " ..
+                                                 lookahed_data_psd)
 
                     ad_subtree:add(psd_full_data, ad_lse)
 
                     lse_number = lse_number + 1
-                    s = s + 1
+                    words_consumed = words_consumed + 1
                 end
             end
         end
