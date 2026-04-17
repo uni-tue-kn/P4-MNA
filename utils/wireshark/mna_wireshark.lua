@@ -12,8 +12,9 @@
 # 25.04.2024 - Initial version                                  #
 # 05.07.2024 - Update encoding to mpls-mna-hdr-07               #
 # 25.10.2024 - Bug fixes introduced with latest encoding        #
+# 17.04.2026 - Added DetNet control word                        #
 #################################################################
---]] 
+--]]  
 
 mna_protocol = Proto("MNA", "MPLS Network Actions")
 
@@ -27,16 +28,16 @@ init_scope = ProtoField.uint32("MNA.scope", "Scope", base.DEC, NULL, 1536)
 bos = ProtoField.uint32("MNA.bos", "Bottom of Stack", base.DEC, NULL, 256)
 init_unknown_action = ProtoField.uint32("MNA.unknown_action",
                                         "Unknown Action Handling", base.DEC,
-                                        NULL, 128)
-init_nasl = ProtoField.uint32("MNA.nasl", "NASL", base.DEC, NULL, 120)
+                                        NULL, 8)
+init_nasl = ProtoField.uint32("MNA.nasl", "NASL", base.DEC, NULL, 240)
 init_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
 
 -- Sub opcode (Format C)
 sub_opcode = ProtoField.uint32("MNA.sub_opcode", "Opcode", base.DEC, NULL,
                                4261412864)
 sub_data1 = ProtoField.uint32("MNA.sub_data1", "Data1", base.DEC, NULL, 33553920)
-sub_unknown_action = ProtoField.uint32("MNA.sub_unknown_action", "Unknown Action Handling", base.DEC, NULL, 128)
-sub_data2 = ProtoField.uint32("MNA.sub_data2", "Data2", base.DEC, NULL, 120)
+sub_unknown_action = ProtoField.uint32("MNA.sub_unknown_action", "Unknown Action Handling", base.DEC, NULL, 8)
+sub_data2 = ProtoField.uint32("MNA.sub_data2", "Data2", base.DEC, NULL, 240)
 sub_nal = ProtoField.uint32("MNA.nal", "NAL", base.DEC, NULL, 7)
 
 -- AD LSE (Format D)
@@ -84,13 +85,58 @@ psd_protocol.fields = {
     psd_ps_nal, psd_data, psd_full_data
 }
 
+detnet_cw_protocol = Proto("DetNetCW", "DetNet Control Word")
+
+detnet_cw_version = ProtoField.uint32("DetNetCW.version", "Version", base.DEC,
+                                      NULL, 4026531840)
+detnet_cw_sequence_number = ProtoField.uint32("DetNetCW.sequence_number",
+                                              "DetNet Sequence Number",
+                                              base.DEC, NULL, 268435455)
+
+detnet_cw_protocol.fields = {detnet_cw_version, detnet_cw_sequence_number}
+
 -- TO BE CHANGED ON IANA SPECIFICATION
 local MNA_BSPL = 4;
 local FIRST_NIBBLE_PSD = 10
 
 local MPLS_ETHER_TYPE = 0x8847;
+local DETNET_CONTROL_WORD_FIRST_NIBBLE = 0
 local IPV4_VERSION = 4
 local IPV6_VERSION = 6
+
+local function dissect_post_stack_payload(buffer, byte_offset, pinfo, tree)
+    if byte_offset >= buffer:len() then return end
+
+    local first_byte = buffer(byte_offset, 1)
+    local first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
+
+    if first_nibble == DETNET_CONTROL_WORD_FIRST_NIBBLE then
+        if byte_offset + 4 > buffer:len() then return end
+
+        local detnet_cw = buffer(byte_offset, 4)
+        local detnet_cw_subtree = tree:add(detnet_cw_protocol, detnet_cw,
+                                           "DetNet Control Word")
+
+        detnet_cw_subtree:add(detnet_cw_version, detnet_cw)
+        detnet_cw_subtree:add(detnet_cw_sequence_number, detnet_cw)
+
+        byte_offset = byte_offset + 4
+        if byte_offset >= buffer:len() then return end
+
+        first_byte = buffer(byte_offset, 1)
+        first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
+    end
+
+    if first_nibble == IPV4_VERSION then
+        ipv4_dissector = Dissector.get("ip")
+        ipv4_dissector:call(buffer:range(byte_offset):tvb(), pinfo, tree)
+    elseif first_nibble == IPV6_VERSION then
+        ipv6_dissector = Dissector.get("ipv6")
+        ipv6_dissector:call(buffer:range(byte_offset):tvb(), pinfo, tree)
+    elseif first_nibble == FIRST_NIBBLE_PSD then
+        psd_protocol.dissector(buffer:range(byte_offset):tvb(), pinfo, tree)
+    end
+end
 
 function mna_protocol.dissector(buffer, pinfo, tree)
 
@@ -138,7 +184,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                 scope_str = "Undefined"
             end
 
-            nasl = bit.rshift(bit.band(initial_opcode_lse:uint(), 120), 3)
+            nasl = bit.rshift(bit.band(initial_opcode_lse:uint(), 240), 4)
 
             init_nal_lookahead = bit.band(initial_opcode_lse:uint(), 7)
 
@@ -206,7 +252,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
                     local lookahead_data1 =
                         bit.rshift(bit.band(sub_opcode_lse:uint(), 33553920), 9)
                     local lookahead_data2 =
-                        bit.rshift(bit.band(sub_opcode_lse:uint(), 120), 3)
+                        bit.rshift(bit.band(sub_opcode_lse:uint(), 240), 4)
                     lookahead_bos = bit.band(sub_opcode_lse:int(), 256);
 
                     sub_opcode_subtree =
@@ -261,19 +307,7 @@ function mna_protocol.dissector(buffer, pinfo, tree)
         end
     end
 
-    -- First nibble after stack lookahead
-    first_byte = buffer(lse_number * 4, 1)
-    first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
-
-    if first_nibble == IPV4_VERSION then
-        ipv4_dissector = Dissector.get("ip")
-        ipv4_dissector:call(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    elseif first_nibble == IPV6_VERSION then
-        ipv6_dissector = Dissector.get("ipv6")
-        ipv6_dissector:call(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    elseif first_nibble == FIRST_NIBBLE_PSD then
-        psd_protocol.dissector(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    end
+    dissect_post_stack_payload(buffer, lse_number * 4, pinfo, tree)
 
 end
 
@@ -346,19 +380,7 @@ function psd_protocol.dissector(buffer, pinfo, tree)
         end
     end
 
-    -- First nibble after stack lookahead
-    first_byte = buffer(lse_number * 4, 1)
-    first_nibble = bit.rshift(bit.band(first_byte:uint(), 240), 4)
-
-    if first_nibble == IPV4_VERSION then
-        ipv4_dissector = Dissector.get("ip")
-        ipv4_dissector:call(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    elseif first_nibble == IPV6_VERSION then
-        ipv6_dissector = Dissector.get("ipv6")
-        ipv6_dissector:call(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    elseif first_nibble == FIRST_NIBBLE_PSD then
-        psd_protocol.dissector(buffer:range(lse_number * 4):tvb(), pinfo, tree)
-    end
+    dissect_post_stack_payload(buffer, lse_number * 4, pinfo, tree)
 
 end
 
